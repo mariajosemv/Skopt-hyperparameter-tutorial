@@ -1,0 +1,1872 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "name": "experiment",
+      "provenance": [],
+      "collapsed_sections": [
+        "WP8W386n6LMh",
+        "r_NBnKsfDHcV"
+      ],
+      "authorship_tag": "ABX9TyMGBh4Ly0wDAnRJW6EwSzko",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/mariajosemv/Skopt-hyperparameter-tutorial/blob/master/scikit_optimize_regression_tutorial.ipynb.\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "OluWPsr973qH"
+      },
+      "source": [
+        "# Initialization"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "n2QCogfj086j",
+        "outputId": "329881a5-d306-4749-ff11-ec4689c9f141",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "source": [
+        "import pandas as pd\n",
+        "import numpy as np\n",
+        "import io\n",
+        "from google.colab import files\n",
+        "\n",
+        "from google.colab import drive\n",
+        "drive.mount('/content/drive')"
+      ],
+      "execution_count": 60,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "Drive already mounted at /content/drive; to attempt to forcibly remount, call drive.mount(\"/content/drive\", force_remount=True).\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "bvJnqtYH1MkC",
+        "outputId": "d75f0393-f419-4e98-cc0b-e00d3c03bc45",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "source": [
+        "%cd '/content/drive/My Drive/Colab Notebooks/curso-redes-neuronales/proyecto-del-curso'\n",
+        "%ls"
+      ],
+      "execution_count": 61,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "/content/drive/My Drive/Colab Notebooks/curso-redes-neuronales/proyecto-del-curso\n",
+            "cars.parquet        data-engineer.ipynb             experiment\n",
+            "craiglist_cars.csv  design-training-and-evaluation  experiment-back-up\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "G7NfuP3r1QXy"
+      },
+      "source": [
+        "cars = pd.read_parquet('cars.parquet')"
+      ],
+      "execution_count": 62,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "WP8W386n6LMh"
+      },
+      "source": [
+        "# Train, validation and test division data"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "83P-OyNO6Rte"
+      },
+      "source": [
+        "target = cars['price']\n",
+        "cars.drop('price', axis=1, inplace=True)"
+      ],
+      "execution_count": 63,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "0OJnB3LK6N8q",
+        "outputId": "59649f79-705a-43ab-beb9-04ad1cb7d691",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "source": [
+        "from sklearn.model_selection import train_test_split\n",
+        "# Train/test 80:20\n",
+        "x_train, x_test, y_train, y_test = train_test_split(cars, target, test_size=0.2,random_state=2020)\n",
+        "# Train/Validation 90:10\n",
+        "x_train, x_val, y_train, y_val = train_test_split(x_train,y_train, test_size=0.1, random_state=2020)\n",
+        "\n",
+        "print(\"Shape of x_train:\",x_train.shape)\n",
+        "print(\"Shape of x_test:\",x_test.shape)\n",
+        "print(\"Shape of x_val:\",x_val.shape)\n",
+        "print(\"Shape of y_train:\",y_train.shape)\n",
+        "print(\"Shape of y_test:\",y_test.shape)\n",
+        "print(\"Shape of y_val:\",y_val.shape)"
+      ],
+      "execution_count": 64,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "Shape of x_train: (312869, 99)\n",
+            "Shape of x_test: (86909, 99)\n",
+            "Shape of x_val: (34764, 99)\n",
+            "Shape of y_train: (312869,)\n",
+            "Shape of y_test: (86909,)\n",
+            "Shape of y_val: (34764,)\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "cxSOtHA28pue"
+      },
+      "source": [
+        "## Standarization"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "DfwmDNvv9H_f",
+        "outputId": "ec3dfc12-b712-4289-d723-d000e2dc00a7",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "source": [
+        "print(x_train.shape)\n",
+        "print(y_train.shape)"
+      ],
+      "execution_count": 65,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "(312869, 99)\n",
+            "(312869,)\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "yFdBJpFI-ug1"
+      },
+      "source": [
+        "y_train = y_train.values.reshape(-1,1)\n",
+        "y_test = y_test.values.reshape(-1,1)\n",
+        "y_val = y_val.values.reshape(-1,1)"
+      ],
+      "execution_count": 66,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "weMaA9h88r5S"
+      },
+      "source": [
+        "from sklearn.preprocessing import StandardScaler\n",
+        "\n",
+        "# scaler for x\n",
+        "scaler = StandardScaler()\n",
+        "scaler.fit(x_train) \n",
+        "x_train_scaled = scaler.transform(x_train)\n",
+        "x_val_scaled = scaler.transform(x_val)\n",
+        "x_test_scaled = scaler.transform(x_test)\n",
+        "\n",
+        "# scaler for y\n",
+        "scaler2 = StandardScaler()\n",
+        "scaler2.fit(y_train) \n",
+        "y_train_scaled = scaler2.transform(y_train)\n",
+        "y_val_scaled = scaler2.transform(y_val)\n",
+        "y_test_scaled = scaler2.transform(y_test)"
+      ],
+      "execution_count": 67,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "r_NBnKsfDHcV"
+      },
+      "source": [
+        "# Estimated Arquitecture\n",
+        "\n",
+        "- The input data has 99 entries, so the entry number of neurons would be 99 x 2 = 198 $\\Rightarrow$ $2^8$ = 256. \n",
+        "- As we are facing a regression problem, the activation function will be **Linear** and the metric will be **MSE**."
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "UxhnVcnl9tzo"
+      },
+      "source": [
+        "**Important**:\n",
+        "\n",
+        "```\n",
+        "K.clear_session()\n",
+        "tensorflow.compat.v1.reset_default_graph()    \n",
+        "```\n",
+        "\n",
+        "Running these two lines of code can solve a lot of the TensorFlow errors that seem impossible to read. They clear much of the information tensor flow has stored. \n",
+        "\n",
+        "> Run this code (i. e. the function `reset()`) before every hyperparameter or anything that makes a new Keras/TensorFlow model. \n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "luiO4OrdFIYS"
+      },
+      "source": [
+        "def reset():\n",
+        "  K.clear_session()\n",
+        "  tensorflow.compat.v1.reset_default_graph()\n",
+        "\n",
+        "reset()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "O8rB0t9S40mv"
+      },
+      "source": [
+        "# Optimization Functions\n",
+        "Tutorial guide:\n",
+        "- [Medium](https://medium.com/@crawftv/parameter-hyperparameter-tuning-with-bayesian-optimization-7acf42d348e1)\n",
+        "- [GitHub](https://github.com/crawftv/Skopt-hyperparameter-tutorial/blob/master/scikit_optimize_tutorial.ipynb)\n",
+        "\n",
+        "See also:\n",
+        "- [Blairhudson](http://blairhudson.com/blog/posts/optimising-hyper-parameters-efficiently-with-scikit-optimize/)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "g-mLPemh45hZ",
+        "outputId": "ce5d5807-1660-4f5c-842b-f4ded002b794",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "source": [
+        "!pip install scikit-optimize\n",
+        "import skopt\n",
+        "\n",
+        "from skopt import gbrt_minimize, gp_minimize\n",
+        "from skopt.utils import use_named_args\n",
+        "from skopt.space import Real, Categorical, Integer  \n",
+        "\n",
+        "import tensorflow\n",
+        "from tensorflow.python.keras import backend as K"
+      ],
+      "execution_count": 68,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "Requirement already satisfied: scikit-optimize in /usr/local/lib/python3.6/dist-packages (0.8.1)\n",
+            "Requirement already satisfied: joblib>=0.11 in /usr/local/lib/python3.6/dist-packages (from scikit-optimize) (0.17.0)\n",
+            "Requirement already satisfied: pyaml>=16.9 in /usr/local/lib/python3.6/dist-packages (from scikit-optimize) (20.4.0)\n",
+            "Requirement already satisfied: scikit-learn>=0.20.0 in /usr/local/lib/python3.6/dist-packages (from scikit-optimize) (0.22.2.post1)\n",
+            "Requirement already satisfied: scipy>=0.19.1 in /usr/local/lib/python3.6/dist-packages (from scikit-optimize) (1.4.1)\n",
+            "Requirement already satisfied: numpy>=1.13.3 in /usr/local/lib/python3.6/dist-packages (from scikit-optimize) (1.18.5)\n",
+            "Requirement already satisfied: PyYAML in /usr/local/lib/python3.6/dist-packages (from pyaml>=16.9->scikit-optimize) (3.13)\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "C9e9beB86N2B"
+      },
+      "source": [
+        "## 1. Defining hyperparameters to optimize"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "74K-vk4Id6Eb",
+        "outputId": "fc26984c-e707-4fd5-c76c-77c0a89b7e79",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "source": [
+        "import math\n",
+        "from keras.models import Sequential\n",
+        "from keras.layers import Dense, Dropout\n",
+        "from keras.utils import plot_model\n",
+        "\n",
+        "input_shape= x_train_scaled[0].shape\n",
+        "input_shape[0]\n",
+        "\n",
+        "potency = int(round(math.log(input_shape[0]*2,2),0))\n",
+        "potency\n",
+        "\n",
+        "2**potency"
+      ],
+      "execution_count": 69,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "256"
+            ]
+          },
+          "metadata": {
+            "tags": []
+          },
+          "execution_count": 69
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "yiBenhSh5lFI"
+      },
+      "source": [
+        "dim_num_dense_layers = Integer(low=1, high=4, name='num_dense_layers')\n",
+        "dim_num_input_nodes = Integer(low=1, high=512, name='num_input_nodes')\n",
+        "dim_num_dense_nodes = Integer(low=1, high=2**potency, name='num_dense_nodes')\n",
+        "dim_activation = Categorical(categories=['relu', 'sigmoid'],\n",
+        "                             name='activation')\n",
+        "dim_batch_size = Integer(low=16, high=2048, name='batch_size')\n",
+        "dim_num_epochs = Integer(low=3,high=100, name='num_epochs')\n",
+        "\n",
+        "dimensions = [dim_num_dense_layers,\n",
+        "              dim_num_input_nodes,\n",
+        "              dim_num_dense_nodes,\n",
+        "              dim_activation,\n",
+        "              dim_batch_size,\n",
+        "              #dim_adam_decay,\n",
+        "             ]\n",
+        "default_parameters = [1,2**potency, 13, 'relu',64]"
+      ],
+      "execution_count": 70,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "xLSZoN6D7U9T"
+      },
+      "source": [
+        "## 2. Create models that will be tested"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "e32tzg7W7Xny"
+      },
+      "source": [
+        "def create_model(num_dense_layers,num_input_nodes,\n",
+        "                 num_dense_nodes, activation):\n",
+        "    #start the model making process and create our first layer\n",
+        "    model = Sequential()\n",
+        "    model.add(Dense(num_input_nodes, input_shape= input_shape, activation=activation\n",
+        "                   ))\n",
+        "    #create a loop making a new dense layer for the amount passed to this model.\n",
+        "    #naming the layers helps avoid tensorflow error deep in the stack trace.\n",
+        "    for i in range(num_dense_layers):\n",
+        "        name = 'layer_dense_{0}'.format(i+1)\n",
+        "        model.add(Dense(num_dense_nodes,\n",
+        "                        activation=activation,\n",
+        "                        name=name\n",
+        "                 ))\n",
+        "    # add dropout to avoid overfitting\n",
+        "    model.add(Dropout(0.2))\n",
+        "    \n",
+        "    #add our regression layer.\n",
+        "    model.add(Dense(1,activation='linear'))\n",
+        "    \n",
+        "    #setup our optimizer and compile\n",
+        "    model.compile(optimizer = \"adam\",loss=\"mse\",metrics=[\"mean_absolute_error\"])\n",
+        "\n",
+        "    return model"
+      ],
+      "execution_count": 71,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "Mmv3eIIa8pOB"
+      },
+      "source": [
+        "## Fitness function\n",
+        "\n",
+        "We use create_model to create our model, fit the model, print the accuracy, and delete the model."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "4WI1a1s48y2Z"
+      },
+      "source": [
+        "@use_named_args(dimensions=dimensions)\n",
+        "def fitness(num_dense_layers, num_input_nodes, \n",
+        "            num_dense_nodes,activation, batch_size):\n",
+        "\n",
+        "    model = create_model(num_dense_layers=num_dense_layers,\n",
+        "                         num_input_nodes=num_input_nodes,\n",
+        "                         num_dense_nodes=num_dense_nodes,\n",
+        "                         activation=activation,\n",
+        "                        )\n",
+        "    \n",
+        "\n",
+        "    #named blackbox becuase it represents the structure\n",
+        "    blackbox = model.fit(x=x_train_scaled,\n",
+        "                        y=y_train_scaled,\n",
+        "                        epochs=5,\n",
+        "                        batch_size=batch_size,\n",
+        "                        validation_split=0.10,\n",
+        "                        )\n",
+        "    \n",
+        "    #return the validation accuracy for the last epoch.\n",
+        "\n",
+        "    mae = blackbox.history['mean_absolute_error'][-1]\n",
+        "    # Print the regression loss\n",
+        "    print()\n",
+        "    print(f\"mae: {mae}\")\n",
+        "    print()\n",
+        "\n",
+        "    # Delete the Keras model with these hyper-parameters from memory.\n",
+        "    del model\n",
+        "    \n",
+        "    # Clear the Keras session, otherwise it will keep adding new\n",
+        "    # models to the same TensorFlow graph each time we create\n",
+        "    # a model with a different set of hyper-parameters.\n",
+        "    K.clear_session()\n",
+        "    tensorflow.compat.v1.reset_default_graph()    \n",
+        "    # the optimizer aims for the lowest score, so we return our negative loss\n",
+        "    return mae"
+      ],
+      "execution_count": 74,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "6AlfSuE-CUNA"
+      },
+      "source": [
+        "# Start the search!"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "P274WyCUbJc-"
+      },
+      "source": [
+        "## Gaussian Process"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "isslkMXhCXaz",
+        "outputId": "6a26ae7f-01ac-4b8f-c4a8-be2243d8b8d4",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "source": [
+        "gp_result = gp_minimize(func=fitness,\n",
+        "                            dimensions=dimensions,\n",
+        "                            n_calls=12,\n",
+        "                            noise= 0.01,\n",
+        "                            n_jobs=-1,\n",
+        "                            kappa = 5,\n",
+        "                            x0=default_parameters)"
+      ],
+      "execution_count": 75,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "Epoch 1/5\n",
+            "4400/4400 [==============================] - 8s 2ms/step - loss: 0.5565 - mean_absolute_error: 0.5152 - val_loss: 0.4783 - val_mean_absolute_error: 0.4605\n",
+            "Epoch 2/5\n",
+            "4400/4400 [==============================] - 7s 2ms/step - loss: 0.4989 - mean_absolute_error: 0.4829 - val_loss: 0.4711 - val_mean_absolute_error: 0.4607\n",
+            "Epoch 3/5\n",
+            "4400/4400 [==============================] - 7s 2ms/step - loss: 0.4859 - mean_absolute_error: 0.4764 - val_loss: 0.4623 - val_mean_absolute_error: 0.4534\n",
+            "Epoch 4/5\n",
+            "4400/4400 [==============================] - 7s 2ms/step - loss: 0.4779 - mean_absolute_error: 0.4722 - val_loss: 0.4640 - val_mean_absolute_error: 0.4579\n",
+            "Epoch 5/5\n",
+            "4400/4400 [==============================] - 7s 2ms/step - loss: 0.4707 - mean_absolute_error: 0.4685 - val_loss: 0.4495 - val_mean_absolute_error: 0.4358\n",
+            "\n",
+            "mae: 0.4684898555278778\n",
+            "\n",
+            "Epoch 1/5\n",
+            "166/166 [==============================] - 4s 23ms/step - loss: 0.6104 - mean_absolute_error: 0.5569 - val_loss: 0.4946 - val_mean_absolute_error: 0.4763\n",
+            "Epoch 2/5\n",
+            "166/166 [==============================] - 4s 22ms/step - loss: 0.4854 - mean_absolute_error: 0.4667 - val_loss: 0.4673 - val_mean_absolute_error: 0.4482\n",
+            "Epoch 3/5\n",
+            "166/166 [==============================] - 4s 23ms/step - loss: 0.4641 - mean_absolute_error: 0.4527 - val_loss: 0.4577 - val_mean_absolute_error: 0.4530\n",
+            "Epoch 4/5\n",
+            "166/166 [==============================] - 4s 22ms/step - loss: 0.4490 - mean_absolute_error: 0.4441 - val_loss: 0.4465 - val_mean_absolute_error: 0.4420\n",
+            "Epoch 5/5\n",
+            "166/166 [==============================] - 4s 23ms/step - loss: 0.4343 - mean_absolute_error: 0.4366 - val_loss: 0.4408 - val_mean_absolute_error: 0.4327\n",
+            "\n",
+            "mae: 0.4366424083709717\n",
+            "\n",
+            "Epoch 1/5\n",
+            "309/309 [==============================] - 4s 13ms/step - loss: 0.5431 - mean_absolute_error: 0.5100 - val_loss: 0.4742 - val_mean_absolute_error: 0.4526\n",
+            "Epoch 2/5\n",
+            "309/309 [==============================] - 4s 12ms/step - loss: 0.4773 - mean_absolute_error: 0.4580 - val_loss: 0.4608 - val_mean_absolute_error: 0.4563\n",
+            "Epoch 3/5\n",
+            "309/309 [==============================] - 4s 12ms/step - loss: 0.4440 - mean_absolute_error: 0.4427 - val_loss: 0.4548 - val_mean_absolute_error: 0.4387\n",
+            "Epoch 4/5\n",
+            "309/309 [==============================] - 4s 12ms/step - loss: 0.4316 - mean_absolute_error: 0.4356 - val_loss: 0.4381 - val_mean_absolute_error: 0.4352\n",
+            "Epoch 5/5\n",
+            "309/309 [==============================] - 4s 11ms/step - loss: 0.4277 - mean_absolute_error: 0.4314 - val_loss: 0.4321 - val_mean_absolute_error: 0.4328\n",
+            "\n",
+            "mae: 0.43136730790138245\n",
+            "\n",
+            "Epoch 1/5\n",
+            "10831/10831 [==============================] - 25s 2ms/step - loss: 0.5085 - mean_absolute_error: 0.4797 - val_loss: 0.4622 - val_mean_absolute_error: 0.4506\n",
+            "Epoch 2/5\n",
+            "10831/10831 [==============================] - 25s 2ms/step - loss: 0.4606 - mean_absolute_error: 0.4500 - val_loss: 0.4490 - val_mean_absolute_error: 0.4398\n",
+            "Epoch 3/5\n",
+            "10831/10831 [==============================] - 25s 2ms/step - loss: 0.4426 - mean_absolute_error: 0.4402 - val_loss: 0.4445 - val_mean_absolute_error: 0.4427\n",
+            "Epoch 4/5\n",
+            "10831/10831 [==============================] - 25s 2ms/step - loss: 0.4307 - mean_absolute_error: 0.4343 - val_loss: 0.4319 - val_mean_absolute_error: 0.4311\n",
+            "Epoch 5/5\n",
+            "10831/10831 [==============================] - 25s 2ms/step - loss: 0.4186 - mean_absolute_error: 0.4278 - val_loss: 0.4311 - val_mean_absolute_error: 0.4226\n",
+            "\n",
+            "mae: 0.42775803804397583\n",
+            "\n",
+            "Epoch 1/5\n",
+            "151/151 [==============================] - 3s 21ms/step - loss: 0.8003 - mean_absolute_error: 0.6789 - val_loss: 0.6139 - val_mean_absolute_error: 0.5507\n",
+            "Epoch 2/5\n",
+            "151/151 [==============================] - 3s 20ms/step - loss: 0.5735 - mean_absolute_error: 0.5229 - val_loss: 0.5457 - val_mean_absolute_error: 0.5026\n",
+            "Epoch 3/5\n",
+            "151/151 [==============================] - 3s 20ms/step - loss: 0.5544 - mean_absolute_error: 0.5063 - val_loss: 0.5379 - val_mean_absolute_error: 0.4908\n",
+            "Epoch 4/5\n",
+            "151/151 [==============================] - 3s 20ms/step - loss: 0.5399 - mean_absolute_error: 0.4948 - val_loss: 0.5279 - val_mean_absolute_error: 0.4806\n",
+            "Epoch 5/5\n",
+            "151/151 [==============================] - 3s 20ms/step - loss: 0.5257 - mean_absolute_error: 0.4845 - val_loss: 0.5127 - val_mean_absolute_error: 0.4706\n",
+            "\n",
+            "mae: 0.48450008034706116\n",
+            "\n",
+            "Epoch 1/5\n",
+            "141/141 [==============================] - 6s 40ms/step - loss: 0.5603 - mean_absolute_error: 0.5214 - val_loss: 0.4771 - val_mean_absolute_error: 0.4540\n",
+            "Epoch 2/5\n",
+            "141/141 [==============================] - 6s 44ms/step - loss: 0.4815 - mean_absolute_error: 0.4526 - val_loss: 0.5664 - val_mean_absolute_error: 0.5311\n",
+            "Epoch 3/5\n",
+            "141/141 [==============================] - 6s 41ms/step - loss: 0.4643 - mean_absolute_error: 0.4484 - val_loss: 0.4481 - val_mean_absolute_error: 0.4438\n",
+            "Epoch 4/5\n",
+            "141/141 [==============================] - 6s 40ms/step - loss: 0.4334 - mean_absolute_error: 0.4350 - val_loss: 0.4382 - val_mean_absolute_error: 0.4356\n",
+            "Epoch 5/5\n",
+            "141/141 [==============================] - 6s 40ms/step - loss: 0.4237 - mean_absolute_error: 0.4294 - val_loss: 0.4316 - val_mean_absolute_error: 0.4310\n",
+            "\n",
+            "mae: 0.42936038970947266\n",
+            "\n",
+            "Epoch 1/5\n",
+            "158/158 [==============================] - 6s 40ms/step - loss: 0.5714 - mean_absolute_error: 0.5289 - val_loss: 0.4822 - val_mean_absolute_error: 0.4626\n",
+            "Epoch 2/5\n",
+            "158/158 [==============================] - 6s 39ms/step - loss: 0.4966 - mean_absolute_error: 0.4606 - val_loss: 0.4560 - val_mean_absolute_error: 0.4435\n",
+            "Epoch 3/5\n",
+            "158/158 [==============================] - 6s 39ms/step - loss: 0.4680 - mean_absolute_error: 0.4467 - val_loss: 0.4447 - val_mean_absolute_error: 0.4385\n",
+            "Epoch 4/5\n",
+            "158/158 [==============================] - 6s 39ms/step - loss: 0.4655 - mean_absolute_error: 0.4399 - val_loss: 0.4379 - val_mean_absolute_error: 0.4279\n",
+            "Epoch 5/5\n",
+            "158/158 [==============================] - 6s 39ms/step - loss: 0.4433 - mean_absolute_error: 0.4326 - val_loss: 0.4372 - val_mean_absolute_error: 0.4380\n",
+            "\n",
+            "mae: 0.43255022168159485\n",
+            "\n",
+            "Epoch 1/5\n",
+            "168/168 [==============================] - 2s 14ms/step - loss: 0.7253 - mean_absolute_error: 0.6281 - val_loss: 0.5622 - val_mean_absolute_error: 0.5264\n",
+            "Epoch 2/5\n",
+            "168/168 [==============================] - 2s 14ms/step - loss: 0.5814 - mean_absolute_error: 0.5008 - val_loss: 0.4878 - val_mean_absolute_error: 0.4644\n",
+            "Epoch 3/5\n",
+            "168/168 [==============================] - 2s 13ms/step - loss: 0.5333 - mean_absolute_error: 0.4723 - val_loss: 0.4745 - val_mean_absolute_error: 0.4554\n",
+            "Epoch 4/5\n",
+            "168/168 [==============================] - 2s 13ms/step - loss: 0.4884 - mean_absolute_error: 0.4601 - val_loss: 0.4657 - val_mean_absolute_error: 0.4480\n",
+            "Epoch 5/5\n",
+            "168/168 [==============================] - 2s 13ms/step - loss: 0.4631 - mean_absolute_error: 0.4533 - val_loss: 0.4601 - val_mean_absolute_error: 0.4489\n",
+            "\n",
+            "mae: 0.4532989263534546\n",
+            "\n",
+            "Epoch 1/5\n",
+            "156/156 [==============================] - 7s 44ms/step - loss: 0.5809 - mean_absolute_error: 0.5356 - val_loss: 0.4815 - val_mean_absolute_error: 0.4629\n",
+            "Epoch 2/5\n",
+            "156/156 [==============================] - 7s 44ms/step - loss: 0.4887 - mean_absolute_error: 0.4595 - val_loss: 0.4617 - val_mean_absolute_error: 0.4455\n",
+            "Epoch 3/5\n",
+            "156/156 [==============================] - 7s 43ms/step - loss: 0.4519 - mean_absolute_error: 0.4451 - val_loss: 0.4445 - val_mean_absolute_error: 0.4358\n",
+            "Epoch 4/5\n",
+            "156/156 [==============================] - 7s 44ms/step - loss: 0.4471 - mean_absolute_error: 0.4373 - val_loss: 0.4370 - val_mean_absolute_error: 0.4356\n",
+            "Epoch 5/5\n",
+            "156/156 [==============================] - 7s 44ms/step - loss: 0.4403 - mean_absolute_error: 0.4310 - val_loss: 0.4315 - val_mean_absolute_error: 0.4340\n",
+            "\n",
+            "mae: 0.43098586797714233\n",
+            "\n",
+            "Epoch 1/5\n",
+            "12243/12243 [==============================] - 22s 2ms/step - loss: 0.5094 - mean_absolute_error: 0.4827 - val_loss: 0.4815 - val_mean_absolute_error: 0.4441\n",
+            "Epoch 2/5\n",
+            "12243/12243 [==============================] - 22s 2ms/step - loss: 0.4620 - mean_absolute_error: 0.4512 - val_loss: 0.4507 - val_mean_absolute_error: 0.4356\n",
+            "Epoch 3/5\n",
+            "12243/12243 [==============================] - 22s 2ms/step - loss: 0.4443 - mean_absolute_error: 0.4404 - val_loss: 0.4424 - val_mean_absolute_error: 0.4418\n",
+            "Epoch 4/5\n",
+            "12243/12243 [==============================] - 26s 2ms/step - loss: 0.4326 - mean_absolute_error: 0.4339 - val_loss: 0.4284 - val_mean_absolute_error: 0.4304\n",
+            "Epoch 5/5\n",
+            "12243/12243 [==============================] - 22s 2ms/step - loss: 0.4232 - mean_absolute_error: 0.4282 - val_loss: 0.4262 - val_mean_absolute_error: 0.4226\n",
+            "\n",
+            "mae: 0.42819249629974365\n",
+            "\n",
+            "Epoch 1/5\n",
+            "674/674 [==============================] - 12s 18ms/step - loss: 0.5200 - mean_absolute_error: 0.4929 - val_loss: 0.4667 - val_mean_absolute_error: 0.4553\n",
+            "Epoch 2/5\n",
+            "674/674 [==============================] - 12s 17ms/step - loss: 0.4671 - mean_absolute_error: 0.4507 - val_loss: 0.4564 - val_mean_absolute_error: 0.4388\n",
+            "Epoch 3/5\n",
+            "674/674 [==============================] - 12s 17ms/step - loss: 0.4350 - mean_absolute_error: 0.4357 - val_loss: 0.4377 - val_mean_absolute_error: 0.4320\n",
+            "Epoch 4/5\n",
+            "674/674 [==============================] - 12s 17ms/step - loss: 0.4282 - mean_absolute_error: 0.4259 - val_loss: 0.4286 - val_mean_absolute_error: 0.4241\n",
+            "Epoch 5/5\n",
+            "674/674 [==============================] - 11s 17ms/step - loss: 0.4048 - mean_absolute_error: 0.4171 - val_loss: 0.4205 - val_mean_absolute_error: 0.4224\n",
+            "\n",
+            "mae: 0.41710367798805237\n",
+            "\n",
+            "Epoch 1/5\n",
+            "3755/3755 [==============================] - 28s 7ms/step - loss: 0.5559 - mean_absolute_error: 0.5079 - val_loss: 0.5072 - val_mean_absolute_error: 0.4806\n",
+            "Epoch 2/5\n",
+            "3755/3755 [==============================] - 28s 8ms/step - loss: 0.4961 - mean_absolute_error: 0.4677 - val_loss: 0.4825 - val_mean_absolute_error: 0.4509\n",
+            "Epoch 3/5\n",
+            "3755/3755 [==============================] - 28s 8ms/step - loss: 0.4772 - mean_absolute_error: 0.4566 - val_loss: 0.4707 - val_mean_absolute_error: 0.4420\n",
+            "Epoch 4/5\n",
+            "3755/3755 [==============================] - 29s 8ms/step - loss: 0.4644 - mean_absolute_error: 0.4487 - val_loss: 0.4659 - val_mean_absolute_error: 0.4582\n",
+            "Epoch 5/5\n",
+            "3755/3755 [==============================] - 29s 8ms/step - loss: 0.4518 - mean_absolute_error: 0.4418 - val_loss: 0.4527 - val_mean_absolute_error: 0.4378\n",
+            "\n",
+            "mae: 0.4418030381202698\n",
+            "\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "GakGYfgGXac7",
+        "outputId": "d41a5818-082c-4672-83f2-96d4708ade88",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "source": [
+        "# the optimal parameters are:\n",
+        "gp_result.x"
+      ],
+      "execution_count": 76,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "[4, 145, 239, 'relu', 418]"
+            ]
+          },
+          "metadata": {
+            "tags": []
+          },
+          "execution_count": 76
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "g3lEwhoNO9Ex",
+        "outputId": "ec996ce9-270f-486a-e5bc-557a05c6baa0",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 426
+        }
+      },
+      "source": [
+        "final_gp_results = pd.concat([pd.DataFrame(gp_result.x_iters, \n",
+        "                        columns = [\"hidden layers\",\n",
+        "                                   \"input layer nodes\",\n",
+        "                                   \"hidden layer nodes\",\n",
+        "                                    \"activation function\",\n",
+        "                                   \"batch size\"]),\n",
+        "(pd.Series(gp_result.func_vals, name=\"mae\"))], axis=1)\n",
+        "\n",
+        "final_gp_results"
+      ],
+      "execution_count": 77,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/html": [
+              "<div>\n",
+              "<style scoped>\n",
+              "    .dataframe tbody tr th:only-of-type {\n",
+              "        vertical-align: middle;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe tbody tr th {\n",
+              "        vertical-align: top;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe thead th {\n",
+              "        text-align: right;\n",
+              "    }\n",
+              "</style>\n",
+              "<table border=\"1\" class=\"dataframe\">\n",
+              "  <thead>\n",
+              "    <tr style=\"text-align: right;\">\n",
+              "      <th></th>\n",
+              "      <th>hidden layers</th>\n",
+              "      <th>input layer nodes</th>\n",
+              "      <th>hidden layer nodes</th>\n",
+              "      <th>activation function</th>\n",
+              "      <th>batch size</th>\n",
+              "      <th>mae</th>\n",
+              "    </tr>\n",
+              "  </thead>\n",
+              "  <tbody>\n",
+              "    <tr>\n",
+              "      <th>0</th>\n",
+              "      <td>1</td>\n",
+              "      <td>256</td>\n",
+              "      <td>13</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>64</td>\n",
+              "      <td>0.468490</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>1</th>\n",
+              "      <td>3</td>\n",
+              "      <td>135</td>\n",
+              "      <td>133</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>1698</td>\n",
+              "      <td>0.436642</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>2</th>\n",
+              "      <td>4</td>\n",
+              "      <td>209</td>\n",
+              "      <td>80</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>913</td>\n",
+              "      <td>0.431367</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>3</th>\n",
+              "      <td>2</td>\n",
+              "      <td>216</td>\n",
+              "      <td>185</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>26</td>\n",
+              "      <td>0.427758</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>4</th>\n",
+              "      <td>3</td>\n",
+              "      <td>391</td>\n",
+              "      <td>56</td>\n",
+              "      <td>sigmoid</td>\n",
+              "      <td>1877</td>\n",
+              "      <td>0.484500</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>5</th>\n",
+              "      <td>3</td>\n",
+              "      <td>462</td>\n",
+              "      <td>118</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>2005</td>\n",
+              "      <td>0.429360</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>6</th>\n",
+              "      <td>2</td>\n",
+              "      <td>430</td>\n",
+              "      <td>184</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>1792</td>\n",
+              "      <td>0.432550</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>7</th>\n",
+              "      <td>1</td>\n",
+              "      <td>95</td>\n",
+              "      <td>200</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>1681</td>\n",
+              "      <td>0.453299</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>8</th>\n",
+              "      <td>2</td>\n",
+              "      <td>325</td>\n",
+              "      <td>229</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>1813</td>\n",
+              "      <td>0.430986</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>9</th>\n",
+              "      <td>3</td>\n",
+              "      <td>136</td>\n",
+              "      <td>87</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>23</td>\n",
+              "      <td>0.428192</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>10</th>\n",
+              "      <td>4</td>\n",
+              "      <td>145</td>\n",
+              "      <td>239</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>418</td>\n",
+              "      <td>0.417104</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>11</th>\n",
+              "      <td>4</td>\n",
+              "      <td>504</td>\n",
+              "      <td>241</td>\n",
+              "      <td>sigmoid</td>\n",
+              "      <td>75</td>\n",
+              "      <td>0.441803</td>\n",
+              "    </tr>\n",
+              "  </tbody>\n",
+              "</table>\n",
+              "</div>"
+            ],
+            "text/plain": [
+              "    hidden layers  input layer nodes  ...  batch size       mae\n",
+              "0               1                256  ...          64  0.468490\n",
+              "1               3                135  ...        1698  0.436642\n",
+              "2               4                209  ...         913  0.431367\n",
+              "3               2                216  ...          26  0.427758\n",
+              "4               3                391  ...        1877  0.484500\n",
+              "5               3                462  ...        2005  0.429360\n",
+              "6               2                430  ...        1792  0.432550\n",
+              "7               1                 95  ...        1681  0.453299\n",
+              "8               2                325  ...        1813  0.430986\n",
+              "9               3                136  ...          23  0.428192\n",
+              "10              4                145  ...         418  0.417104\n",
+              "11              4                504  ...          75  0.441803\n",
+              "\n",
+              "[12 rows x 6 columns]"
+            ]
+          },
+          "metadata": {
+            "tags": []
+          },
+          "execution_count": 77
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "Ck3z_W4gX3-n",
+        "outputId": "f9da6e01-f72e-4041-ec3a-182211b8e650",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "source": [
+        "# call the best model\n",
+        "model1 = create_model(gp_result.x[0],gp_result.x[1],gp_result.x[2],gp_result.x[3])\n",
+        "print(model1.summary())"
+      ],
+      "execution_count": 78,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "Model: \"sequential\"\n",
+            "_________________________________________________________________\n",
+            "Layer (type)                 Output Shape              Param #   \n",
+            "=================================================================\n",
+            "dense (Dense)                (None, 145)               14500     \n",
+            "_________________________________________________________________\n",
+            "layer_dense_1 (Dense)        (None, 239)               34894     \n",
+            "_________________________________________________________________\n",
+            "layer_dense_2 (Dense)        (None, 239)               57360     \n",
+            "_________________________________________________________________\n",
+            "layer_dense_3 (Dense)        (None, 239)               57360     \n",
+            "_________________________________________________________________\n",
+            "layer_dense_4 (Dense)        (None, 239)               57360     \n",
+            "_________________________________________________________________\n",
+            "dropout (Dropout)            (None, 239)               0         \n",
+            "_________________________________________________________________\n",
+            "dense_1 (Dense)              (None, 1)                 240       \n",
+            "=================================================================\n",
+            "Total params: 221,714\n",
+            "Trainable params: 221,714\n",
+            "Non-trainable params: 0\n",
+            "_________________________________________________________________\n",
+            "None\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "k16oRy-5RXcz",
+        "outputId": "65b7a5cc-1512-4855-f87b-1d3656abfcb5",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "source": [
+        "model1.fit(x_train_scaled,y_train_scaled, epochs=50)\n",
+        "model1.evaluate(x_test_scaled,y_test_scaled)"
+      ],
+      "execution_count": 79,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "Epoch 1/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.5041 - mean_absolute_error: 0.4772\n",
+            "Epoch 2/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.4541 - mean_absolute_error: 0.4443\n",
+            "Epoch 3/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.4340 - mean_absolute_error: 0.4336\n",
+            "Epoch 4/50\n",
+            "9778/9778 [==============================] - 38s 4ms/step - loss: 0.4214 - mean_absolute_error: 0.4261\n",
+            "Epoch 5/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.4110 - mean_absolute_error: 0.4204\n",
+            "Epoch 6/50\n",
+            "9778/9778 [==============================] - 40s 4ms/step - loss: 0.4021 - mean_absolute_error: 0.4155\n",
+            "Epoch 7/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3942 - mean_absolute_error: 0.4113\n",
+            "Epoch 8/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3903 - mean_absolute_error: 0.4086\n",
+            "Epoch 9/50\n",
+            "9778/9778 [==============================] - 38s 4ms/step - loss: 0.3835 - mean_absolute_error: 0.4052\n",
+            "Epoch 10/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3799 - mean_absolute_error: 0.4031\n",
+            "Epoch 11/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3737 - mean_absolute_error: 0.3999\n",
+            "Epoch 12/50\n",
+            "9778/9778 [==============================] - 38s 4ms/step - loss: 0.3701 - mean_absolute_error: 0.3980\n",
+            "Epoch 13/50\n",
+            "9778/9778 [==============================] - 38s 4ms/step - loss: 0.3693 - mean_absolute_error: 0.3978\n",
+            "Epoch 14/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3650 - mean_absolute_error: 0.3948\n",
+            "Epoch 15/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3613 - mean_absolute_error: 0.3926\n",
+            "Epoch 16/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3578 - mean_absolute_error: 0.3910\n",
+            "Epoch 17/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3563 - mean_absolute_error: 0.3899\n",
+            "Epoch 18/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3541 - mean_absolute_error: 0.3884\n",
+            "Epoch 19/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3514 - mean_absolute_error: 0.3871\n",
+            "Epoch 20/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3489 - mean_absolute_error: 0.3858\n",
+            "Epoch 21/50\n",
+            "9778/9778 [==============================] - 38s 4ms/step - loss: 0.3456 - mean_absolute_error: 0.3838\n",
+            "Epoch 22/50\n",
+            "9778/9778 [==============================] - 40s 4ms/step - loss: 0.3445 - mean_absolute_error: 0.3833\n",
+            "Epoch 23/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3438 - mean_absolute_error: 0.3828\n",
+            "Epoch 24/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3411 - mean_absolute_error: 0.3816\n",
+            "Epoch 25/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3395 - mean_absolute_error: 0.3803\n",
+            "Epoch 26/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3367 - mean_absolute_error: 0.3792\n",
+            "Epoch 27/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3355 - mean_absolute_error: 0.3782\n",
+            "Epoch 28/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3360 - mean_absolute_error: 0.3783\n",
+            "Epoch 29/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3327 - mean_absolute_error: 0.3766\n",
+            "Epoch 30/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3318 - mean_absolute_error: 0.3761\n",
+            "Epoch 31/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3297 - mean_absolute_error: 0.3752\n",
+            "Epoch 32/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3285 - mean_absolute_error: 0.3744\n",
+            "Epoch 33/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3270 - mean_absolute_error: 0.3733\n",
+            "Epoch 34/50\n",
+            "9778/9778 [==============================] - 38s 4ms/step - loss: 0.3503 - mean_absolute_error: 0.3749\n",
+            "Epoch 35/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3257 - mean_absolute_error: 0.3725\n",
+            "Epoch 36/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3252 - mean_absolute_error: 0.3723\n",
+            "Epoch 37/50\n",
+            "9778/9778 [==============================] - 38s 4ms/step - loss: 0.3230 - mean_absolute_error: 0.3707\n",
+            "Epoch 38/50\n",
+            "9778/9778 [==============================] - 41s 4ms/step - loss: 0.3223 - mean_absolute_error: 0.3708\n",
+            "Epoch 39/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3222 - mean_absolute_error: 0.3706\n",
+            "Epoch 40/50\n",
+            "9778/9778 [==============================] - 38s 4ms/step - loss: 0.3196 - mean_absolute_error: 0.3697\n",
+            "Epoch 41/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3197 - mean_absolute_error: 0.3696\n",
+            "Epoch 42/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3206 - mean_absolute_error: 0.3698\n",
+            "Epoch 43/50\n",
+            "9778/9778 [==============================] - 38s 4ms/step - loss: 0.3179 - mean_absolute_error: 0.3683\n",
+            "Epoch 44/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3169 - mean_absolute_error: 0.3680\n",
+            "Epoch 45/50\n",
+            "9778/9778 [==============================] - 38s 4ms/step - loss: 0.3175 - mean_absolute_error: 0.3681\n",
+            "Epoch 46/50\n",
+            "9778/9778 [==============================] - 38s 4ms/step - loss: 0.3152 - mean_absolute_error: 0.3672\n",
+            "Epoch 47/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3148 - mean_absolute_error: 0.3670\n",
+            "Epoch 48/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3139 - mean_absolute_error: 0.3663\n",
+            "Epoch 49/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3143 - mean_absolute_error: 0.3667\n",
+            "Epoch 50/50\n",
+            "9778/9778 [==============================] - 37s 4ms/step - loss: 0.3146 - mean_absolute_error: 0.3664\n",
+            "2716/2716 [==============================] - 3s 1ms/step - loss: 0.3894 - mean_absolute_error: 0.3912\n"
+          ],
+          "name": "stdout"
+        },
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "[0.38941797614097595, 0.3912051320075989]"
+            ]
+          },
+          "metadata": {
+            "tags": []
+          },
+          "execution_count": 79
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "6dE-vZYoUt_L"
+      },
+      "source": [
+        "## Gradient Boosted Regression Trees"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "cml2-Sa3Ux36",
+        "outputId": "3c54c3ed-136a-45ea-b983-a93e2c536893",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "source": [
+        "gbrt_result = gbrt_minimize(func=fitness,\n",
+        "                            dimensions=dimensions,\n",
+        "                            n_calls=12,\n",
+        "                            n_jobs=-1,\n",
+        "                            x0=default_parameters)"
+      ],
+      "execution_count": 84,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "Epoch 1/5\n",
+            "4400/4400 [==============================] - 7s 2ms/step - loss: 0.5548 - mean_absolute_error: 0.5169 - val_loss: 0.4792 - val_mean_absolute_error: 0.4624\n",
+            "Epoch 2/5\n",
+            "4400/4400 [==============================] - 7s 2ms/step - loss: 0.4933 - mean_absolute_error: 0.4779 - val_loss: 0.4656 - val_mean_absolute_error: 0.4507\n",
+            "Epoch 3/5\n",
+            "4400/4400 [==============================] - 7s 2ms/step - loss: 0.4784 - mean_absolute_error: 0.4695 - val_loss: 0.4538 - val_mean_absolute_error: 0.4453\n",
+            "Epoch 4/5\n",
+            "4400/4400 [==============================] - 7s 2ms/step - loss: 0.4705 - mean_absolute_error: 0.4651 - val_loss: 0.4444 - val_mean_absolute_error: 0.4386\n",
+            "Epoch 5/5\n",
+            "4400/4400 [==============================] - 7s 2ms/step - loss: 0.4620 - mean_absolute_error: 0.4612 - val_loss: 0.4419 - val_mean_absolute_error: 0.4407\n",
+            "\n",
+            "mae: 0.46120312809944153\n",
+            "\n",
+            "Epoch 1/5\n",
+            "1514/1514 [==============================] - 4s 3ms/step - loss: 0.6243 - mean_absolute_error: 0.5550 - val_loss: 0.5318 - val_mean_absolute_error: 0.4868\n",
+            "Epoch 2/5\n",
+            "1514/1514 [==============================] - 4s 3ms/step - loss: 0.5219 - mean_absolute_error: 0.4834 - val_loss: 0.4995 - val_mean_absolute_error: 0.4637\n",
+            "Epoch 3/5\n",
+            "1514/1514 [==============================] - 4s 3ms/step - loss: 0.4989 - mean_absolute_error: 0.4698 - val_loss: 0.4848 - val_mean_absolute_error: 0.4568\n",
+            "Epoch 4/5\n",
+            "1514/1514 [==============================] - 4s 3ms/step - loss: 0.4853 - mean_absolute_error: 0.4616 - val_loss: 0.4725 - val_mean_absolute_error: 0.4425\n",
+            "Epoch 5/5\n",
+            "1514/1514 [==============================] - 4s 3ms/step - loss: 0.4749 - mean_absolute_error: 0.4563 - val_loss: 0.4662 - val_mean_absolute_error: 0.4413\n",
+            "\n",
+            "mae: 0.4563150405883789\n",
+            "\n",
+            "Epoch 1/5\n",
+            "176/176 [==============================] - 2s 13ms/step - loss: 0.6077 - mean_absolute_error: 0.5580 - val_loss: 0.4871 - val_mean_absolute_error: 0.4703\n",
+            "Epoch 2/5\n",
+            "176/176 [==============================] - 2s 13ms/step - loss: 0.4796 - mean_absolute_error: 0.4681 - val_loss: 0.4606 - val_mean_absolute_error: 0.4538\n",
+            "Epoch 3/5\n",
+            "176/176 [==============================] - 2s 13ms/step - loss: 0.4624 - mean_absolute_error: 0.4561 - val_loss: 0.4523 - val_mean_absolute_error: 0.4423\n",
+            "Epoch 4/5\n",
+            "176/176 [==============================] - 2s 13ms/step - loss: 0.4472 - mean_absolute_error: 0.4477 - val_loss: 0.4461 - val_mean_absolute_error: 0.4409\n",
+            "Epoch 5/5\n",
+            "176/176 [==============================] - 2s 13ms/step - loss: 0.4399 - mean_absolute_error: 0.4426 - val_loss: 0.4396 - val_mean_absolute_error: 0.4340\n",
+            "\n",
+            "mae: 0.44255489110946655\n",
+            "\n",
+            "Epoch 1/5\n",
+            "166/166 [==============================] - 8s 51ms/step - loss: 0.5769 - mean_absolute_error: 0.5331 - val_loss: 0.4836 - val_mean_absolute_error: 0.4622\n",
+            "Epoch 2/5\n",
+            "166/166 [==============================] - 8s 50ms/step - loss: 0.4907 - mean_absolute_error: 0.4660 - val_loss: 0.4673 - val_mean_absolute_error: 0.4461\n",
+            "Epoch 3/5\n",
+            "166/166 [==============================] - 8s 49ms/step - loss: 0.4475 - mean_absolute_error: 0.4443 - val_loss: 0.4448 - val_mean_absolute_error: 0.4367\n",
+            "Epoch 4/5\n",
+            "166/166 [==============================] - 8s 49ms/step - loss: 0.4337 - mean_absolute_error: 0.4366 - val_loss: 0.4358 - val_mean_absolute_error: 0.4371\n",
+            "Epoch 5/5\n",
+            "166/166 [==============================] - 8s 50ms/step - loss: 0.4385 - mean_absolute_error: 0.4303 - val_loss: 0.4287 - val_mean_absolute_error: 0.4300\n",
+            "\n",
+            "mae: 0.4303363561630249\n",
+            "\n",
+            "Epoch 1/5\n",
+            "1401/1401 [==============================] - 13s 9ms/step - loss: 0.5073 - mean_absolute_error: 0.4809 - val_loss: 0.4656 - val_mean_absolute_error: 0.4528\n",
+            "Epoch 2/5\n",
+            "1401/1401 [==============================] - 13s 9ms/step - loss: 0.5101 - mean_absolute_error: 0.4487 - val_loss: 0.4554 - val_mean_absolute_error: 0.4316\n",
+            "Epoch 3/5\n",
+            "1401/1401 [==============================] - 13s 9ms/step - loss: 0.4313 - mean_absolute_error: 0.4320 - val_loss: 0.4290 - val_mean_absolute_error: 0.4258\n",
+            "Epoch 4/5\n",
+            "1401/1401 [==============================] - 13s 9ms/step - loss: 0.4245 - mean_absolute_error: 0.4235 - val_loss: 0.4255 - val_mean_absolute_error: 0.4167\n",
+            "Epoch 5/5\n",
+            "1401/1401 [==============================] - 13s 10ms/step - loss: 0.4097 - mean_absolute_error: 0.4165 - val_loss: 0.4166 - val_mean_absolute_error: 0.4163\n",
+            "\n",
+            "mae: 0.41654181480407715\n",
+            "\n",
+            "Epoch 1/5\n",
+            "238/238 [==============================] - 9s 36ms/step - loss: 0.7943 - mean_absolute_error: 0.6676 - val_loss: 0.5839 - val_mean_absolute_error: 0.5317\n",
+            "Epoch 2/5\n",
+            "238/238 [==============================] - 8s 35ms/step - loss: 0.5586 - mean_absolute_error: 0.5101 - val_loss: 0.5279 - val_mean_absolute_error: 0.4851\n",
+            "Epoch 3/5\n",
+            "238/238 [==============================] - 8s 35ms/step - loss: 0.5231 - mean_absolute_error: 0.4837 - val_loss: 0.5115 - val_mean_absolute_error: 0.4718\n",
+            "Epoch 4/5\n",
+            "238/238 [==============================] - 8s 35ms/step - loss: 0.5087 - mean_absolute_error: 0.4728 - val_loss: 0.5014 - val_mean_absolute_error: 0.4632\n",
+            "Epoch 5/5\n",
+            "238/238 [==============================] - 8s 35ms/step - loss: 0.5000 - mean_absolute_error: 0.4664 - val_loss: 0.4991 - val_mean_absolute_error: 0.4611\n",
+            "\n",
+            "mae: 0.46644139289855957\n",
+            "\n",
+            "Epoch 1/5\n",
+            "183/183 [==============================] - 3s 16ms/step - loss: 0.7023 - mean_absolute_error: 0.6107 - val_loss: 0.5147 - val_mean_absolute_error: 0.4867\n",
+            "Epoch 2/5\n",
+            "183/183 [==============================] - 3s 15ms/step - loss: 0.5341 - mean_absolute_error: 0.4886 - val_loss: 0.4791 - val_mean_absolute_error: 0.4601\n",
+            "Epoch 3/5\n",
+            "183/183 [==============================] - 3s 15ms/step - loss: 0.5924 - mean_absolute_error: 0.4660 - val_loss: 0.4675 - val_mean_absolute_error: 0.4537\n",
+            "Epoch 4/5\n",
+            "183/183 [==============================] - 3s 15ms/step - loss: 0.4726 - mean_absolute_error: 0.4546 - val_loss: 0.4561 - val_mean_absolute_error: 0.4433\n",
+            "Epoch 5/5\n",
+            "183/183 [==============================] - 3s 15ms/step - loss: 0.4575 - mean_absolute_error: 0.4484 - val_loss: 0.4521 - val_mean_absolute_error: 0.4389\n",
+            "\n",
+            "mae: 0.4484395384788513\n",
+            "\n",
+            "Epoch 1/5\n",
+            "138/138 [==============================] - 5s 34ms/step - loss: 0.9686 - mean_absolute_error: 0.7685 - val_loss: 0.6689 - val_mean_absolute_error: 0.6062\n",
+            "Epoch 2/5\n",
+            "138/138 [==============================] - 5s 33ms/step - loss: 0.5971 - mean_absolute_error: 0.5416 - val_loss: 0.5485 - val_mean_absolute_error: 0.5016\n",
+            "Epoch 3/5\n",
+            "138/138 [==============================] - 5s 33ms/step - loss: 0.5558 - mean_absolute_error: 0.5077 - val_loss: 0.5442 - val_mean_absolute_error: 0.4952\n",
+            "Epoch 4/5\n",
+            "138/138 [==============================] - 5s 33ms/step - loss: 0.5469 - mean_absolute_error: 0.4998 - val_loss: 0.5385 - val_mean_absolute_error: 0.4972\n",
+            "Epoch 5/5\n",
+            "138/138 [==============================] - 5s 33ms/step - loss: 0.5365 - mean_absolute_error: 0.4919 - val_loss: 0.5269 - val_mean_absolute_error: 0.4787\n",
+            "\n",
+            "mae: 0.49194595217704773\n",
+            "\n",
+            "Epoch 1/5\n",
+            "199/199 [==============================] - 3s 13ms/step - loss: 0.6233 - mean_absolute_error: 0.5633 - val_loss: 0.4967 - val_mean_absolute_error: 0.4728\n",
+            "Epoch 2/5\n",
+            "199/199 [==============================] - 2s 12ms/step - loss: 0.5013 - mean_absolute_error: 0.4756 - val_loss: 0.4648 - val_mean_absolute_error: 0.4544\n",
+            "Epoch 3/5\n",
+            "199/199 [==============================] - 2s 12ms/step - loss: 0.4766 - mean_absolute_error: 0.4614 - val_loss: 0.4592 - val_mean_absolute_error: 0.4458\n",
+            "Epoch 4/5\n",
+            "199/199 [==============================] - 2s 12ms/step - loss: 0.4731 - mean_absolute_error: 0.4543 - val_loss: 0.4519 - val_mean_absolute_error: 0.4463\n",
+            "Epoch 5/5\n",
+            "199/199 [==============================] - 2s 12ms/step - loss: 0.4497 - mean_absolute_error: 0.4491 - val_loss: 0.4438 - val_mean_absolute_error: 0.4377\n",
+            "\n",
+            "mae: 0.44907909631729126\n",
+            "\n",
+            "Epoch 1/5\n",
+            "239/239 [==============================] - 7s 30ms/step - loss: 0.5553 - mean_absolute_error: 0.5181 - val_loss: 0.4736 - val_mean_absolute_error: 0.4551\n",
+            "Epoch 2/5\n",
+            "239/239 [==============================] - 7s 29ms/step - loss: 0.4865 - mean_absolute_error: 0.4567 - val_loss: 0.4548 - val_mean_absolute_error: 0.4443\n",
+            "Epoch 3/5\n",
+            "239/239 [==============================] - 7s 30ms/step - loss: 0.4453 - mean_absolute_error: 0.4413 - val_loss: 0.4404 - val_mean_absolute_error: 0.4390\n",
+            "Epoch 4/5\n",
+            "239/239 [==============================] - 7s 30ms/step - loss: 0.4384 - mean_absolute_error: 0.4319 - val_loss: 0.4409 - val_mean_absolute_error: 0.4452\n",
+            "Epoch 5/5\n",
+            "239/239 [==============================] - 7s 30ms/step - loss: 0.4156 - mean_absolute_error: 0.4247 - val_loss: 0.4272 - val_mean_absolute_error: 0.4250\n",
+            "\n",
+            "mae: 0.42472919821739197\n",
+            "\n",
+            "Epoch 1/5\n",
+            "515/515 [==============================] - 2s 3ms/step - loss: 0.6661 - mean_absolute_error: 0.5938 - val_loss: 0.5123 - val_mean_absolute_error: 0.4876\n",
+            "Epoch 2/5\n",
+            "515/515 [==============================] - 1s 3ms/step - loss: 0.5169 - mean_absolute_error: 0.4944 - val_loss: 0.4831 - val_mean_absolute_error: 0.4648\n",
+            "Epoch 3/5\n",
+            "515/515 [==============================] - 1s 3ms/step - loss: 0.4954 - mean_absolute_error: 0.4795 - val_loss: 0.4769 - val_mean_absolute_error: 0.4657\n",
+            "Epoch 4/5\n",
+            "515/515 [==============================] - 1s 3ms/step - loss: 0.4829 - mean_absolute_error: 0.4713 - val_loss: 0.4675 - val_mean_absolute_error: 0.4543\n",
+            "Epoch 5/5\n",
+            "515/515 [==============================] - 1s 3ms/step - loss: 0.4761 - mean_absolute_error: 0.4677 - val_loss: 0.4617 - val_mean_absolute_error: 0.4474\n",
+            "\n",
+            "mae: 0.46765390038490295\n",
+            "\n",
+            "Epoch 1/5\n",
+            "141/141 [==============================] - 8s 60ms/step - loss: 0.5860 - mean_absolute_error: 0.5394 - val_loss: 0.4803 - val_mean_absolute_error: 0.4662\n",
+            "Epoch 2/5\n",
+            "141/141 [==============================] - 8s 59ms/step - loss: 0.4951 - mean_absolute_error: 0.4586 - val_loss: 0.4746 - val_mean_absolute_error: 0.4491\n",
+            "Epoch 3/5\n",
+            "141/141 [==============================] - 8s 59ms/step - loss: 0.4459 - mean_absolute_error: 0.4425 - val_loss: 0.4419 - val_mean_absolute_error: 0.4349\n",
+            "Epoch 4/5\n",
+            "141/141 [==============================] - 8s 59ms/step - loss: 0.4774 - mean_absolute_error: 0.4339 - val_loss: 0.4423 - val_mean_absolute_error: 0.4311\n",
+            "Epoch 5/5\n",
+            "141/141 [==============================] - 8s 59ms/step - loss: 0.4519 - mean_absolute_error: 0.4310 - val_loss: 0.4335 - val_mean_absolute_error: 0.4274\n",
+            "\n",
+            "mae: 0.4310031831264496\n",
+            "\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "wdvb3Wy3U1W9",
+        "outputId": "e727fe99-2a9f-4dec-dbf7-40d59c09aa19",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 426
+        }
+      },
+      "source": [
+        "final_gbrt_results = pd.concat([pd.DataFrame(gbrt_result.x_iters, \n",
+        "                        columns = [\"hidden layers\",\n",
+        "                                   \"input layer nodes\",\n",
+        "                                   \"hidden layer nodes\",\n",
+        "                                    \"activation function\",\n",
+        "                                   \"batch size\"]),\n",
+        "(pd.Series(gbrt_result.func_vals, name=\"mae\"))], axis=1)\n",
+        "\n",
+        "final_gbrt_results"
+      ],
+      "execution_count": 85,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/html": [
+              "<div>\n",
+              "<style scoped>\n",
+              "    .dataframe tbody tr th:only-of-type {\n",
+              "        vertical-align: middle;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe tbody tr th {\n",
+              "        vertical-align: top;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe thead th {\n",
+              "        text-align: right;\n",
+              "    }\n",
+              "</style>\n",
+              "<table border=\"1\" class=\"dataframe\">\n",
+              "  <thead>\n",
+              "    <tr style=\"text-align: right;\">\n",
+              "      <th></th>\n",
+              "      <th>hidden layers</th>\n",
+              "      <th>input layer nodes</th>\n",
+              "      <th>hidden layer nodes</th>\n",
+              "      <th>activation function</th>\n",
+              "      <th>batch size</th>\n",
+              "      <th>mae</th>\n",
+              "    </tr>\n",
+              "  </thead>\n",
+              "  <tbody>\n",
+              "    <tr>\n",
+              "      <th>0</th>\n",
+              "      <td>1</td>\n",
+              "      <td>256</td>\n",
+              "      <td>13</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>64</td>\n",
+              "      <td>0.461203</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>1</th>\n",
+              "      <td>2</td>\n",
+              "      <td>224</td>\n",
+              "      <td>31</td>\n",
+              "      <td>sigmoid</td>\n",
+              "      <td>186</td>\n",
+              "      <td>0.456315</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>2</th>\n",
+              "      <td>3</td>\n",
+              "      <td>172</td>\n",
+              "      <td>58</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>1604</td>\n",
+              "      <td>0.442555</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>3</th>\n",
+              "      <td>4</td>\n",
+              "      <td>153</td>\n",
+              "      <td>218</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>1698</td>\n",
+              "      <td>0.430336</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>4</th>\n",
+              "      <td>3</td>\n",
+              "      <td>320</td>\n",
+              "      <td>240</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>201</td>\n",
+              "      <td>0.416542</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>5</th>\n",
+              "      <td>2</td>\n",
+              "      <td>427</td>\n",
+              "      <td>241</td>\n",
+              "      <td>sigmoid</td>\n",
+              "      <td>1184</td>\n",
+              "      <td>0.466441</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>6</th>\n",
+              "      <td>1</td>\n",
+              "      <td>141</td>\n",
+              "      <td>206</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>1544</td>\n",
+              "      <td>0.448440</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>7</th>\n",
+              "      <td>4</td>\n",
+              "      <td>290</td>\n",
+              "      <td>107</td>\n",
+              "      <td>sigmoid</td>\n",
+              "      <td>2043</td>\n",
+              "      <td>0.491946</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>8</th>\n",
+              "      <td>1</td>\n",
+              "      <td>293</td>\n",
+              "      <td>62</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>1416</td>\n",
+              "      <td>0.449079</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>9</th>\n",
+              "      <td>3</td>\n",
+              "      <td>162</td>\n",
+              "      <td>223</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>1180</td>\n",
+              "      <td>0.424729</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>10</th>\n",
+              "      <td>3</td>\n",
+              "      <td>54</td>\n",
+              "      <td>15</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>547</td>\n",
+              "      <td>0.467654</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>11</th>\n",
+              "      <td>3</td>\n",
+              "      <td>266</td>\n",
+              "      <td>233</td>\n",
+              "      <td>relu</td>\n",
+              "      <td>2003</td>\n",
+              "      <td>0.431003</td>\n",
+              "    </tr>\n",
+              "  </tbody>\n",
+              "</table>\n",
+              "</div>"
+            ],
+            "text/plain": [
+              "    hidden layers  input layer nodes  ...  batch size       mae\n",
+              "0               1                256  ...          64  0.461203\n",
+              "1               2                224  ...         186  0.456315\n",
+              "2               3                172  ...        1604  0.442555\n",
+              "3               4                153  ...        1698  0.430336\n",
+              "4               3                320  ...         201  0.416542\n",
+              "5               2                427  ...        1184  0.466441\n",
+              "6               1                141  ...        1544  0.448440\n",
+              "7               4                290  ...        2043  0.491946\n",
+              "8               1                293  ...        1416  0.449079\n",
+              "9               3                162  ...        1180  0.424729\n",
+              "10              3                 54  ...         547  0.467654\n",
+              "11              3                266  ...        2003  0.431003\n",
+              "\n",
+              "[12 rows x 6 columns]"
+            ]
+          },
+          "metadata": {
+            "tags": []
+          },
+          "execution_count": 85
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "YHk8zg-qWzn1",
+        "outputId": "9750b954-706e-4491-e622-9761b927062d",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "source": [
+        "gbrt_result.x"
+      ],
+      "execution_count": 86,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "[3, 320, 240, 'relu', 201]"
+            ]
+          },
+          "metadata": {
+            "tags": []
+          },
+          "execution_count": 86
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "zprfh0JfWyXQ",
+        "outputId": "ae242c10-427b-4351-c93c-68293834c718",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "source": [
+        "# call the best model\n",
+        "model2 = create_model(gbrt_result.x[0],gbrt_result.x[1],gbrt_result.x[2],gbrt_result.x[3])\n",
+        "print(model2.summary())"
+      ],
+      "execution_count": 87,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "Model: \"sequential\"\n",
+            "_________________________________________________________________\n",
+            "Layer (type)                 Output Shape              Param #   \n",
+            "=================================================================\n",
+            "dense (Dense)                (None, 320)               32000     \n",
+            "_________________________________________________________________\n",
+            "layer_dense_1 (Dense)        (None, 240)               77040     \n",
+            "_________________________________________________________________\n",
+            "layer_dense_2 (Dense)        (None, 240)               57840     \n",
+            "_________________________________________________________________\n",
+            "layer_dense_3 (Dense)        (None, 240)               57840     \n",
+            "_________________________________________________________________\n",
+            "dropout (Dropout)            (None, 240)               0         \n",
+            "_________________________________________________________________\n",
+            "dense_1 (Dense)              (None, 1)                 241       \n",
+            "=================================================================\n",
+            "Total params: 224,961\n",
+            "Trainable params: 224,961\n",
+            "Non-trainable params: 0\n",
+            "_________________________________________________________________\n",
+            "None\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "aQXD4LNLXDEm",
+        "outputId": "8ff85add-58ee-4f45-95d4-6d55fa405ee6",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "source": [
+        "model2.fit(x_train_scaled,y_train_scaled, epochs=50)"
+      ],
+      "execution_count": 88,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "Epoch 1/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.5005 - mean_absolute_error: 0.4761\n",
+            "Epoch 2/50\n",
+            "9778/9778 [==============================] - 32s 3ms/step - loss: 0.4533 - mean_absolute_error: 0.4452\n",
+            "Epoch 3/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.4353 - mean_absolute_error: 0.4346\n",
+            "Epoch 4/50\n",
+            "9778/9778 [==============================] - 32s 3ms/step - loss: 0.4238 - mean_absolute_error: 0.4285\n",
+            "Epoch 5/50\n",
+            "9778/9778 [==============================] - 32s 3ms/step - loss: 0.4123 - mean_absolute_error: 0.4219\n",
+            "Epoch 6/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.4041 - mean_absolute_error: 0.4172\n",
+            "Epoch 7/50\n",
+            "9778/9778 [==============================] - 32s 3ms/step - loss: 0.3957 - mean_absolute_error: 0.4123\n",
+            "Epoch 8/50\n",
+            "9778/9778 [==============================] - 32s 3ms/step - loss: 0.3898 - mean_absolute_error: 0.4092\n",
+            "Epoch 9/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3859 - mean_absolute_error: 0.4057\n",
+            "Epoch 10/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3807 - mean_absolute_error: 0.4040\n",
+            "Epoch 11/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3756 - mean_absolute_error: 0.4022\n",
+            "Epoch 12/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3710 - mean_absolute_error: 0.3985\n",
+            "Epoch 13/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3675 - mean_absolute_error: 0.3967\n",
+            "Epoch 14/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3649 - mean_absolute_error: 0.3947\n",
+            "Epoch 15/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3588 - mean_absolute_error: 0.3922\n",
+            "Epoch 16/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3590 - mean_absolute_error: 0.3913\n",
+            "Epoch 17/50\n",
+            "9778/9778 [==============================] - 34s 3ms/step - loss: 0.3532 - mean_absolute_error: 0.3888\n",
+            "Epoch 18/50\n",
+            "9778/9778 [==============================] - 32s 3ms/step - loss: 0.3515 - mean_absolute_error: 0.3877\n",
+            "Epoch 19/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3489 - mean_absolute_error: 0.3857\n",
+            "Epoch 20/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3471 - mean_absolute_error: 0.3849\n",
+            "Epoch 21/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3436 - mean_absolute_error: 0.3831\n",
+            "Epoch 22/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3410 - mean_absolute_error: 0.3818\n",
+            "Epoch 23/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3392 - mean_absolute_error: 0.3804\n",
+            "Epoch 24/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3389 - mean_absolute_error: 0.3799\n",
+            "Epoch 25/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3357 - mean_absolute_error: 0.3789\n",
+            "Epoch 26/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3335 - mean_absolute_error: 0.3778\n",
+            "Epoch 27/50\n",
+            "9778/9778 [==============================] - 32s 3ms/step - loss: 0.3321 - mean_absolute_error: 0.3770\n",
+            "Epoch 28/50\n",
+            "9778/9778 [==============================] - 32s 3ms/step - loss: 0.3298 - mean_absolute_error: 0.3758\n",
+            "Epoch 29/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3289 - mean_absolute_error: 0.3749\n",
+            "Epoch 30/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3266 - mean_absolute_error: 0.3734\n",
+            "Epoch 31/50\n",
+            "9778/9778 [==============================] - 32s 3ms/step - loss: 0.3264 - mean_absolute_error: 0.3732\n",
+            "Epoch 32/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3252 - mean_absolute_error: 0.3724\n",
+            "Epoch 33/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3225 - mean_absolute_error: 0.3712\n",
+            "Epoch 34/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3212 - mean_absolute_error: 0.3701\n",
+            "Epoch 35/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3204 - mean_absolute_error: 0.3696\n",
+            "Epoch 36/50\n",
+            "9778/9778 [==============================] - 34s 3ms/step - loss: 0.3200 - mean_absolute_error: 0.3695\n",
+            "Epoch 37/50\n",
+            "9778/9778 [==============================] - 32s 3ms/step - loss: 0.3185 - mean_absolute_error: 0.3683\n",
+            "Epoch 38/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3170 - mean_absolute_error: 0.3676\n",
+            "Epoch 39/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3153 - mean_absolute_error: 0.3664\n",
+            "Epoch 40/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3154 - mean_absolute_error: 0.3667\n",
+            "Epoch 41/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3144 - mean_absolute_error: 0.3661\n",
+            "Epoch 42/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3133 - mean_absolute_error: 0.3654\n",
+            "Epoch 43/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3119 - mean_absolute_error: 0.3643\n",
+            "Epoch 44/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3117 - mean_absolute_error: 0.3642\n",
+            "Epoch 45/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3105 - mean_absolute_error: 0.3638\n",
+            "Epoch 46/50\n",
+            "9778/9778 [==============================] - 32s 3ms/step - loss: 0.3114 - mean_absolute_error: 0.3638\n",
+            "Epoch 47/50\n",
+            "9778/9778 [==============================] - 32s 3ms/step - loss: 0.3088 - mean_absolute_error: 0.3627\n",
+            "Epoch 48/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3073 - mean_absolute_error: 0.3618\n",
+            "Epoch 49/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3325 - mean_absolute_error: 0.3628\n",
+            "Epoch 50/50\n",
+            "9778/9778 [==============================] - 31s 3ms/step - loss: 0.3062 - mean_absolute_error: 0.3615\n",
+            "2716/2716 [==============================] - 3s 1ms/step - loss: 0.3929 - mean_absolute_error: 0.3985\n"
+          ],
+          "name": "stdout"
+        },
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "[0.3929002285003662, 0.3984869420528412]"
+            ]
+          },
+          "metadata": {
+            "tags": []
+          },
+          "execution_count": 88
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "z2NOnpPCXtjD"
+      },
+      "source": [
+        "reset()"
+      ],
+      "execution_count": 83,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "UufD1F21oanX"
+      },
+      "source": [
+        "# Predictions"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "CrkISHEroiZU",
+        "outputId": "410564c3-d9ea-469a-dede-67b2edd74795",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "source": [
+        "real=pd.DataFrame(y_train)\n",
+        "predict_gp = model1.predict(pd.DataFrame(x_train_scaled))\n",
+        "desregularization_gp = scaler2.inverse_transform(predict_gp)\n",
+        "pred_escal_gp =pd.DataFrame(desregularization_gp)\n",
+        "print(f\"Predictions with the model optimized by Gaussian Process\")\n",
+        "for i in range(0,5):\n",
+        "\tprint(\"Real=%s, Prediction=%s\" % (real[0][i], pred_escal_gp[0][i]))"
+      ],
+      "execution_count": 92,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "Predictions with the model optimized by Gaussian Process\n",
+            "Real=18650, Prediction=16810.457\n",
+            "Real=9950, Prediction=9598.377\n",
+            "Real=2000, Prediction=3817.151\n",
+            "Real=7999, Prediction=6342.5933\n",
+            "Real=23999, Prediction=26151.236\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "KG3O8AmMCWfu",
+        "outputId": "6f6d7db0-b2c3-4b89-93b4-7e9a71c5909c",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "source": [
+        "result = model1.evaluate(x_test_scaled,y_test_scaled)\n",
+        "for i in range(len(model1.metrics_names)):\n",
+        " print(\"Metric \",model1.metrics_names[i],\":\",\n",
+        "str(round(result[i],2)))"
+      ],
+      "execution_count": 99,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "2716/2716 [==============================] - 3s 1ms/step - loss: 0.3894 - mean_absolute_error: 0.3912\n",
+            "Metric  loss : 0.39\n",
+            "Metric  mean_absolute_error : 0.39\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "4qB1h0FZBDy_",
+        "outputId": "2847c5e2-f12e-46b6-d3e1-e26bda2eb49a",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "source": [
+        "predict_gbrt = model2.predict(pd.DataFrame(x_train_scaled))\n",
+        "desregularization_gbrt = scaler2.inverse_transform(predict_gbrt)\n",
+        "pred_escal_gbrt =pd.DataFrame(desregularization_gbrt)\n",
+        "print(f\"Predictions with the model optimized by Gaussian Boosted Regression Trees\")\n",
+        "for i in range(0,5):\n",
+        "\tprint(\"Real=%s, Prediction=%s\" % (real[0][i], pred_escal_gbrt[0][i]))"
+      ],
+      "execution_count": 90,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "Predictions with the model optimized by Gaussian Boosted Regression Trees\n",
+            "Real=18650, Prediction=13963.95\n",
+            "Real=9950, Prediction=8337.7\n",
+            "Real=2000, Prediction=4979.528\n",
+            "Real=7999, Prediction=6125.268\n",
+            "Real=23999, Prediction=24421.33\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "CvhgmFeEBWBU",
+        "outputId": "273edfe9-a544-4e0a-b376-edda20b0f056",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "source": [
+        "result = model1.evaluate(x_test_scaled,y_test_scaled)\n",
+        "for i in range(len(model2.metrics_names)):\n",
+        " print(\"Metric \",model2.metrics_names[i],\":\",\n",
+        "str(round(result[i],2)))"
+      ],
+      "execution_count": 97,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "2716/2716 [==============================] - 3s 1ms/step - loss: 0.3894 - mean_absolute_error: 0.3912\n",
+            "Metric  loss : 0.39\n",
+            "Metric  mean_absolute_error : 0.39\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "bVhP7LR7bd64"
+      },
+      "source": [
+        "reset()"
+      ],
+      "execution_count": 98,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "yGp5WWxCAg7a"
+      },
+      "source": [
+        "# Conclusions\n",
+        "\n",
+        "For this dataset, the model given by the Gradient Boosted Regession Trees Optimization is the most simple and gives the same error metrics than the model using Gaussian Process optimization"
+      ]
+    }
+  ]
+}
